@@ -1,7 +1,17 @@
 import numpy as np
 
-# SCORING_PARAMETERS = dict(three_in_a_rows: +2,
-                          # two_in_a_rows
+UNAVAIL = -4242
+
+# normal
+SCORING_PARAMS = dict(me={2: 1, 3: 10, 4: 100}, opp={2: 1, 3: 10, 4: 100})
+# SCORING_PARAMS = dict( me= {2: 0, 3:0, 4:0}, opp={2: 30, 3:100, 4:100})
+# def set_scoring_params(level):
+    # if level == 'easy':
+        # return dict( me={2: 30, 3: 50, 4: 100}, opp={2: 25, 3: 60, 4: 100})
+    # elif level == 'hard':
+        # return dict( me={2: 1, 3: 10, 4: 100}, opp={2: 1, 3: 10, 4: 100})
+    # elif level == 'annoying':
+        # return dict( me= {2: 0, 3:0, 4:0}, opp={2: 30, 3:100, 4:100})
 
 def available_columns(board: np.ndarray):
     avail_cols = []
@@ -31,7 +41,7 @@ def find_patterns(board: np.ndarray, player: int):
             return None
 
     # dont need all 8 directions, (never go straight up)
-    dir_ = ((0,1), (1,1), (1,-1),(0,-1),(-1,-1),(-1,0),(-1,1))
+    dir_ = ((0,1), (1,1), (1,-1), (0,-1), (-1,-1), (1,0), (-1,1))
 
     patterns = {2: 0, 3: 0, 4: 0}
 
@@ -60,8 +70,8 @@ def find_patterns(board: np.ndarray, player: int):
 def score_board(board: np.ndarray, my_patterns: dict, opp_patterns: dict) -> float:
     '''
     '''
-    my_score = my_patterns[2] * 1 + my_patterns[3] * 10 + my_patterns[4] * 100
-    opp_score = opp_patterns[2] * 1 + opp_patterns[3] * 10 + opp_patterns[4] * 100
+    my_score = sum(SCORING_PARAMS['me'][i]*my_patterns[i] for i in (2,3,4))
+    opp_score = sum(SCORING_PARAMS['opp'][i]*opp_patterns[i] for i in (2,3,4))
     score = my_score - opp_score
     return score
 
@@ -71,7 +81,7 @@ def minimax(board, depth, max_depth):
     opp_patterns = find_patterns(board, -1)
     score = score_board(board, my_patterns, opp_patterns)
 
-    if my_patterns[4] > 0 or opp_patterns[4] > 0 or depth == max_depth:
+    if depth == max_depth or my_patterns[4] > 0 or opp_patterns[4] > 0:
         return score
 
     scores = []
@@ -87,24 +97,22 @@ def minimax(board, depth, max_depth):
         return min(scores)
 
 def determine_action(board: np.ndarray, search_depth: int):
-    scores = []
+    scores = [UNAVAIL for _ in range(7)]
 
     avail_cols = available_columns(board)
     for col in avail_cols:
         hypo_board = create_hypo_board(board, col, 1)
-        scores.append( minimax(hypo_board, depth=1, max_depth=search_depth) )
+        scores[col] = minimax(hypo_board, depth=1, max_depth=search_depth)
 
-    print(scores)
-    best_idxs = np.where(scores == np.max(scores))[0]
-    best_cols = avail_cols[best_idxs]
+    best_cols = np.where(scores == np.max(scores))[0]
 
     # randomly break ties
-    # prob = 1/np.minimum(np.abs(best_cols - 3), 0.3)
-    # prob /= prob.sum()
-    # best_col = np.random.choice(best_cols)
+    prob = 1/np.abs(best_cols - 2.9)**0.8
+    prob /= prob.sum()
+    best_col = np.random.choice(best_cols)
 
     # break ties based on closest to middle
-    dist_from_center = np.abs(best_cols - 3)
-    best_col = best_cols[ np.argsort( dist_from_center )[0] ]
+    # dist_from_center = np.abs(best_cols - 3)
+    # best_col = best_cols[ np.argsort( dist_from_center )[0] ]
 
-    return best_col
+    return best_col, dict(scores=scores, col_heights=(board!=0).sum(axis=0))
